@@ -1,0 +1,10 @@
+[Unit]
+Description=Cloudflare DNS update check for %i
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/cloudflare_update.sh
+EnvironmentFile=/etc/cloudflare_dyndns.conf
+EnvironmentFile=/etc/cloudflare_dyndns.d/%i
