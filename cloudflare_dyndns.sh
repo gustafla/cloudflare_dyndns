@@ -1,8 +1,12 @@
 #!/bin/bash
-set -eu
+set -e
+
+[[ -z "$TOKEN" ]] && (echo "TOKEN not defined, check configuration"; exit 1)
+[[ -z "$ZONE" ]] && (echo "ZONE not defined, check configuration"; exit 1)
 
 #https://developers.cloudflare.com/api-next/resources/dns/subresources/records/methods/edit/
 api="https://api.cloudflare.com/client/v4/zones"
+ident="https://ident.me"
 auth="Authorization: Bearer $TOKEN"
 content_type="Content-Type: application/json"
 
@@ -32,10 +36,27 @@ function check_and_update {
 }
 
 # IPv4 address (behind NAT)
-addr_ipv4="$(curl -sS -4 https://ident.me)"
-rx='([1-9]?[0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])'
-[[ $addr_ipv4 =~ ^$rx\.$rx\.$rx\.$rx$ ]] && check_and_update "$RECORD_A" "$addr_ipv4" || (echo addr invalid; true)
+if [[ -z "$RECORDS_A" ]]; then
+  echo "RECORDS_A undefined, skipping IPv4"
+else
+  addr_ipv4="$(curl -sS -4 "$ident")"
+  rx='([1-9]?[0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])'
+  if [[ $addr_ipv4 =~ ^$rx\.$rx\.$rx\.$rx$ ]]; then
+    for record in $RECORDS_A; do
+      check_and_update "$record" "$addr_ipv4"
+    done
+  else
+    echo "Invalid response from $ident"
+  fi
+fi
 
 # IPv6 address (of the $IFACE)
-addr_ipv6="$(ip -6 addr list scope global dev $IFACE | grep -oP '(?<=inet6\s)[\da-f:]+' | grep -v "^fd" | head -n 1)"
-check_and_update "$RECORD_AAAA" "$addr_ipv6"
+if [[ -z "$RECORDS_AAAA" ]]; then
+  echo "RECORDS_AAAA undefined, skipping IPv6"
+else
+  [[ -z "$IFACE" ]] && (echo "IFACE not defined, check configuration"; exit 1)
+  addr_ipv6="$(ip -6 addr list scope global dev $IFACE | grep -oP '(?<=inet6\s)[\da-f:]+' | grep -v "^fd" | head -n 1)"
+  for record in $RECORDS_AAAA; do
+    check_and_update "$record" "$addr_ipv6"
+  done
+fi

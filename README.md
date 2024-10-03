@@ -2,15 +2,17 @@
 
 Do not rely on this script for valuable domains.
 
-## Dependencies:
+## Dependencies
 
 - systemd (you may write your own init scripts if not using systemd)
 - bash
+- grep
+- coreutils
 - curl
 - jq
 - iproute2
 
-## Configuration:
+## Configuration
 
 0. [Create an API token](https://developers.cloudflare.com/fundamentals/api/get-started/create-token/)
 
@@ -24,30 +26,26 @@ set +o history
 set -o history
 ```
 
-3. Create configuration files and directories
+3. Create configuration directory and files
 
-`mkdir /etc/cloudflare_dyndns.d`
+`mkdir /etc/cloudflare_dyndns`
 
-`/etc/cloudflare_dyndns.conf`
+`/etc/cloudflare_dyndns/<mydomain-com>`
 ```
 TOKEN=<your_api_token>
-```
-
-`/etc/cloudflare_dyndns.d/<mydomain-com>`
-```
 IFACE=<your_network_interface_for_mydomain_com>
 ZONE=<zone_id>
-RECORD_A=<a_record_id>
-RECORD_AAAA=<aaaa_record_id>
+RECORDS_A=<a_record_id>
+RECORDS_AAAA=<aaaa_record_id>
 ```
 
 Remember to protect your secrets:
 ```
-chmod 700 /etc/cloudflare_dyndns.d
-chmod 600 /etc/cloudflare_dyndns.d/* /etc/cloudflare_dyndns.conf
+chmod 700 /etc/cloudflare_dyndns
+chmod 600 /etc/cloudflare_dyndns/*
 ```
 
-## Installation:
+## Installation
 
 First install dependencies where this will run, then copy or symlink the files
 
@@ -61,4 +59,63 @@ Finally start (and enable) the timer
 
 ```
 systemctl enable --now cloudflare-dyndns@mydomain-com.timer
+```
+
+## Example
+
+Let's say you want to set the same addresses to
+`mydomain.com` and `www.mydomain.com`.
+First you run `./get_records.sh mydomain.com <your_api_token>`
+and get the following:
+```
+Zone ID: zzzzz
+{
+  "id": "aaaaa",
+  "name": "www.mydomain.com",
+  "type": "A"
+}
+{
+  "id": "bbbbb",
+  "name": "www.mydomain.com",
+  "type": "AAAA"
+}
+{
+  "id": "ccccc",
+  "name": "mydomain.com",
+  "type": "A"
+}
+{
+  "id": "ddddd",
+  "name": "mydomain.com",
+  "type": "AAAA"
+}
+```
+
+Then you create a configuration file on the host with the address you want:
+
+`/etc/cloudflare_dyndns/mydomain-com`
+```
+TOKEN=<your_api_token>
+ZONE=zzzzz
+IFACE=enp1s0
+RECORDS_A=aaaaa ccccc
+RECORDS_AAAA=bbbbb ddddd
+```
+
+Remember to protect your secrets:
+```
+chmod 700 /etc/cloudflare_dyndns
+chmod 600 /etc/cloudflare_dyndns/*
+```
+
+Finally you start the timer template for the configuration file instance
+
+```
+systemctl enable --now cloudflare-dyndns@mydomain-com.timer
+```
+
+Check that the timers and services are working:
+```
+systemctl list-timers
+systemctl status cloudflare-dyndns@mydomain-com.service
 ```
