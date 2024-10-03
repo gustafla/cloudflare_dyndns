@@ -17,7 +17,7 @@ function record_get {
 
 # $1: Record ID, $2: New address
 function record_patch {
-  curl -sS -X PATCH --data-binary @- -H "$auth" -H "$content_type" "$api/$ZONE/dns_records/$1" << 'EOF' | jq
+  curl -sS -X PATCH --data-binary @- -H "$auth" -H "$content_type" "$api/$ZONE/dns_records/$1" << EOF | jq
 {"content":"$2"}
 EOF
 }
