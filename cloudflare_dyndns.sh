@@ -3,15 +3,17 @@ set -eu
 
 #https://developers.cloudflare.com/api-next/resources/dns/subresources/records/methods/edit/
 api="https://api.cloudflare.com/client/v4/zones"
+auth="Authorization: Bearer $TOKEN"
+content_type="Content-Type: application/json"
 
 # $1: Record ID
 function record_get {
-  curl -sS -X GET -H "Authorization: Bearer $TOKEN" -H "Content-Type:application/json" "$api/$ZONE/dns_records/$1" | jq -r '.result.content'
+  curl -sS -X GET -H "$auth" -H "$content_type" "$api/$ZONE/dns_records/$1" | jq -er '.result.content'
 }
 
 # $1: Record ID, $2: New address
 function record_patch {
-  curl -sS -X PATCH --data-binary @- -H "Authorization: Bearer $TOKEN" -H "Content-Type:application/json" "$api/$ZONE/dns_records/$1" << 'EOF' | jq -e '.success' >/dev/null || (echo failed; true)
+  curl -sS -X PATCH --data-binary @- -H "$auth" -H "$content_type" "$api/$ZONE/dns_records/$1" << 'EOF' | jq -e '.success' >/dev/null || (echo failed; true)
 {"content":"$2"}
 EOF
 }

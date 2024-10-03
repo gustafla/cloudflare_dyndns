@@ -5,6 +5,6 @@ After=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/cloudflare_update.sh
+ExecStart=/usr/local/bin/cloudflare_dyndns.sh
 EnvironmentFile=/etc/cloudflare_dyndns.conf
 EnvironmentFile=/etc/cloudflare_dyndns.d/%i
