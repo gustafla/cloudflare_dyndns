@@ -4,38 +4,36 @@ set -eu
 #https://developers.cloudflare.com/api-next/resources/dns/subresources/records/methods/edit/
 api="https://api.cloudflare.com/client/v4/zones"
 
-ident_a_addr="$(curl -sS -4 https://ident.me)"
-echo cur $ident_a_addr
-rx='([1-9]?[0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])'
-[[ $ident_a_addr =~ ^$rx\.$rx\.$rx\.$rx$ ]] || (echo addr invalid; exit 1)
-ip_aaaa_addr="$(ip -6 addr list scope global dev $IFACE | grep -oP '(?<=inet6\s)[\da-f:]+' | grep -v "^fd" | head -n 1)"
-echo cur $ip_aaaa_addr
-
-dns=($NS)
-dns_server=${dns[$RANDOM % ${#dns[@]}]}
-echo sending dns queries to $dns_server
-
-#TODO replace dig with Cloudflare API
-dns_a_record="$(dig +short @$dns_server $zone A)"
-echo dns $dns_a_record \($zone\)
-if [[ "$dns_a_record" != "$ident_a_addr" ]]; then
-  echo updating
-  #curl -4sS "https://dynv6.com/api/update?zone=$zone&token=$TOKEN&ipv4=$ident_a_addr"
-  curl -sS -X PATCH --data-binary @- -H "Authorization: Bearer $TOKEN" -H "Content-Type:application/json" "$api/$ZONE/dns_records/$RECORD_A" <<EOF
-{
-  "content": "$ident_a_addr"
+# $1: Record ID
+function record_get {
+  curl -sS -X GET -H "Authorization: Bearer $TOKEN" -H "Content-Type:application/json" "$api/$ZONE/dns_records/$1" | jq -r '.result.content'
 }
-EOF
-else
-  echo no action
-fi
 
-#TODO replace dig with Cloudflare API
-dns_aaaa_record="$(dig +short @$dns_server $zone AAAA)"
-echo dns $dns_aaaa_record \($zone\)
-if [[ "$dns_aaaa_record" != "$ip_aaaa_addr" ]]; then
-  echo updating
-  #curl -sS "https://dynv6.com/api/update?zone=$zone&token=$TOKEN&ipv6prefix=auto&ipv6=$ip_aaaa_addr"
-else
-  echo no action
-fi
+# $1: Record ID, $2: New address
+function record_patch {
+  curl -sS -X PATCH --data-binary @- -H "Authorization: Bearer $TOKEN" -H "Content-Type:application/json" "$api/$ZONE/dns_records/$1" << 'EOF' | jq -e '.success' >/dev/null || (echo failed; true)
+{"content":"$2"}
+EOF
+}
+
+# $1: Record ID, $2: My address
+function check_and_update {
+  record="$(record_get $1)"
+  echo new "$2"
+  echo old "$record"
+  if [[ "$record" != "$2" ]]; then
+    echo updating
+    record_patch "$1" "$2"
+  else
+    echo no action
+  fi
+}
+
+# IPv4 address (behind NAT)
+addr_ipv4="$(curl -sS -4 https://ident.me)"
+rx='([1-9]?[0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])'
+[[ $addr_ipv4 =~ ^$rx\.$rx\.$rx\.$rx$ ]] && check_and_update "$RECORD_A" "$addr_ipv4" || (echo addr invalid; true)
+
+# IPv6 address (of the $IFACE)
+addr_ipv6="$(ip -6 addr list scope global dev $IFACE | grep -oP '(?<=inet6\s)[\da-f:]+' | grep -v "^fd" | head -n 1)"
+check_and_update "$RECORD_AAAA" "$addr_ipv6"
