@@ -2,7 +2,7 @@
 Description=Check Cloudflare DNS periodically (%i)
 
 [Timer]
-OnBootSec=1min
+OnBootSec=2min
 OnUnitActiveSec=5min
 
 [Install]

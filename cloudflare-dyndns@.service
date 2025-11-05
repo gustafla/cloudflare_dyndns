@@ -7,3 +7,5 @@ After=network-online.target
 Type=simple
 ExecStart=/usr/local/bin/cloudflare_dyndns.sh
 EnvironmentFile=/etc/cloudflare_dyndns/%i
+Restart=on-failure
+RestartSec=30s
